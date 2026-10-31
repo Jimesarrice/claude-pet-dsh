@@ -1,4 +1,4 @@
-﻿;(() => {
+;(() => {
   window.__ModuleLoader__.load({
     id: 'claude-pet-dsh',
     factory: (require) => {
@@ -6,21 +6,36 @@
       const { useEffect, useRef, useState } = React;
       const h = React.createElement;
 
-      const STATE_URL = '/claude-pet-dsh/state';
-      const SHEET_URL = '/claude-pet-dsh/spritesheet.webp';
-      const CELL_W = 192;
-      const CELL_H = 208;
-      const FRAME_MS = 130;
-      const POS_KEY = 'claude-pet-dsh.position';
+      const BASE = '/claude-pet-dsh';
+      const STATE_URL = BASE + '/state';
+      const ART_URL = BASE + '/assets/svg/';
+      const POS_KEY = 'claude-pet-dsh.position.v2';
 
-      const ROWS = {
-        idle: { row: 0, frames: 6, loop: true },
-        working: { row: 7, frames: 6, loop: true },
-        waiting: { row: 6, frames: 6, loop: true },
-        complete: { row: 4, frames: 5, loop: false },
-        error: { row: 5, frames: 8, loop: true },
-        connecting: { row: 3, frames: 4, loop: true },
-        offline: { row: 0, frames: 6, loop: true }
+      // Artwork geometry: every Clawd SVG uses viewBox="-15 -25 45 45", with the
+      // character body sitting around x 0..15, y 6..16. We crop a window out of
+      // that canvas and scale it, so the transparent padding never becomes an
+      // invisible click target and animated accessories above the head stay in view.
+      const VIEW = { x: -15, y: -25, w: 45, h: 45 };
+      const CROP = { x: -6, y: -9, w: 23, h: 28 };
+      const SCALE = 7;
+      const PET_W = Math.round(CROP.w * SCALE);
+      const PET_H = Math.round(CROP.h * SCALE);
+      const IMG_W = VIEW.w * SCALE;
+      const IMG_H = VIEW.h * SCALE;
+      const IMG_LEFT = Math.round((VIEW.x - CROP.x) * SCALE);
+      const IMG_TOP = Math.round((VIEW.y - CROP.y) * SCALE);
+      const HEAD_TOP = Math.round((4.5 - CROP.y) * SCALE);
+      const EDGE = 8;
+
+      const ART = {
+        idle: 'clawd-mini-idle.svg',
+        working: 'clawd-working-typing.svg',
+        waiting: 'clawd-mini-peek.svg',
+        complete: 'clawd-happy.svg',
+        error: 'clawd-error.svg',
+        connecting: 'clawd-wake.svg',
+        offline: 'clawd-sleeping.svg',
+        dragging: 'clawd-react-drag.svg'
       };
 
       const LABEL = {
@@ -43,20 +58,8 @@
         offline: '先打个盹。'
       };
 
-      const rootStyle = {
-        position: 'fixed',
-        zIndex: 2147483000,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'flex-end',
-        gap: '6px',
-        pointerEvents: 'none',
-        fontFamily: '"Microsoft YaHei UI", "Segoe UI", system-ui, sans-serif',
-        userSelect: 'none'
-      };
-
       const bubbleStyle = {
-        pointerEvents: 'auto',
+        position: 'absolute',
         width: '250px',
         padding: '10px 12px 9px',
         border: '1px solid rgba(240, 200, 150, .28)',
@@ -64,7 +67,9 @@
         background: 'rgba(30, 27, 24, .94)',
         color: '#f7e8d2',
         boxShadow: '0 12px 30px rgba(0, 0, 0, .3)',
-        backdropFilter: 'blur(10px)'
+        backdropFilter: 'blur(10px)',
+        fontFamily: '"Microsoft YaHei UI", "Segoe UI", system-ui, sans-serif',
+        pointerEvents: 'auto'
       };
 
       const headerStyle = {
@@ -77,20 +82,6 @@
         letterSpacing: '.12em'
       };
 
-      const petBoxStyle = {
-        pointerEvents: 'auto',
-        cursor: 'grab',
-        touchAction: 'none',
-        filter: 'drop-shadow(0 10px 14px rgba(0,0,0,.28))'
-      };
-
-      const canvasStyle = {
-        display: 'block',
-        width: '168px',
-        height: '182px',
-        imageRendering: 'pixelated'
-      };
-
       const buttonStyle = {
         border: '1px solid rgba(240, 200, 150, .28)',
         borderRadius: '999px',
@@ -99,6 +90,21 @@
         cursor: 'pointer',
         font: '11px/1.2 "Microsoft YaHei UI", sans-serif',
         padding: '3px 8px'
+      };
+
+      const dotStyle = {
+        position: 'fixed',
+        right: '18px',
+        bottom: '18px',
+        zIndex: 2147483000,
+        width: '14px',
+        height: '14px',
+        padding: 0,
+        borderRadius: '50%',
+        border: '2px solid rgba(255, 255, 255, .55)',
+        background: '#DE886D',
+        boxShadow: '0 2px 10px rgba(0, 0, 0, .35)',
+        cursor: 'pointer'
       };
 
       function loadPosition() {
@@ -113,13 +119,20 @@
         try { localStorage.setItem(POS_KEY, JSON.stringify(value)); } catch {}
       }
 
-      function clampPosition(x, y) {
-        const width = 260;
-        const height = 360;
+      function clampPosition(value) {
+        const maxX = Math.max(EDGE, window.innerWidth - PET_W - EDGE);
+        const maxY = Math.max(EDGE, window.innerHeight - PET_H - EDGE);
         return {
-          x: Math.max(6, Math.min(x, window.innerWidth - width - 6)),
-          y: Math.max(6, Math.min(y, window.innerHeight - height - 6))
+          x: Math.min(Math.max(EDGE, value.x), maxX),
+          y: Math.min(Math.max(EDGE, value.y), maxY)
         };
+      }
+
+      function defaultPosition() {
+        return clampPosition({
+          x: window.innerWidth - PET_W - 8,
+          y: window.innerHeight - PET_H - 12
+        });
       }
 
       function taskLine(state, task) {
@@ -135,15 +148,12 @@
         const [snapshot, setSnapshot] = useState({ state: 'idle', task: null });
         const [bubble, setBubble] = useState(true);
         const [hidden, setHidden] = useState(false);
-        const [position, setPosition] = useState(loadPosition);
-        const canvasRef = useRef(null);
-        const imageRef = useRef(null);
-        const snapshotRef = useRef(snapshot);
+        const [dragging, setDragging] = useState(false);
+        const [position, setPosition] = useState(() => clampPosition(loadPosition() ?? defaultPosition()));
+        const positionRef = useRef(position);
         const dragRef = useRef(null);
         const movedRef = useRef(false);
-        const positionRef = useRef(position);
         positionRef.current = position;
-        snapshotRef.current = snapshot;
 
         useEffect(() => {
           let alive = true;
@@ -161,50 +171,23 @@
         }, []);
 
         useEffect(() => {
-          const canvas = canvasRef.current;
-          if (!canvas) return;
-          const ctx = canvas.getContext('2d');
-          const image = new Image();
-          image.src = SHEET_URL;
-          image.onload = () => { imageRef.current = image; };
-          let raf = 0;
-          let row = -1;
-          let started = 0;
-          const draw = now => {
-            const state = snapshotRef.current?.state || 'idle';
-            const meta = ROWS[state] || ROWS.idle;
-            if (meta.row !== row) { row = meta.row; started = now; }
-            if (image.complete && image.naturalWidth) {
-              let frame = Math.floor((now - started) / FRAME_MS);
-              frame = meta.loop ? frame % meta.frames : Math.min(frame, meta.frames - 1);
-              ctx.clearRect(0, 0, CELL_W, CELL_H);
-              ctx.imageSmoothingEnabled = false;
-              ctx.drawImage(image, frame * CELL_W, meta.row * CELL_H, CELL_W, CELL_H, 0, 0, CELL_W, CELL_H);
-            }
-            raf = requestAnimationFrame(draw);
-          };
-          raf = requestAnimationFrame(draw);
-          return () => cancelAnimationFrame(raf);
+          const onResize = () => setPosition(current => clampPosition(current));
+          window.addEventListener('resize', onResize);
+          return () => window.removeEventListener('resize', onResize);
         }, []);
 
-        const state = LABEL[snapshot.state] ? snapshot.state : 'idle';
-        const task = snapshot.task && snapshot.task.total > 0 ? snapshot.task : null;
-        const taskPercent = task ? Math.round(task.progress * 100) : 0;
-        const style = position
-          ? { ...rootStyle, left: position.x + 'px', top: position.y + 'px' }
-          : { ...rootStyle, right: '22px', bottom: '22px' };
-
         const beginDrag = event => {
-          const rect = event.currentTarget.getBoundingClientRect();
+          if (event.button !== undefined && event.button !== 0) return;
           dragRef.current = {
             pointerId: event.pointerId,
             startX: event.clientX,
             startY: event.clientY,
-            originX: rect.left,
-            originY: rect.top
+            origin: positionRef.current
           };
           movedRef.current = false;
-          event.currentTarget.setPointerCapture?.(event.pointerId);
+          setDragging(true);
+          try { event.currentTarget.setPointerCapture(event.pointerId); } catch {}
+          if (event.preventDefault) event.preventDefault();
         };
 
         const moveDrag = event => {
@@ -213,43 +196,58 @@
           const dx = event.clientX - drag.startX;
           const dy = event.clientY - drag.startY;
           if (Math.abs(dx) + Math.abs(dy) > 3) movedRef.current = true;
-          const next = clampPosition(drag.originX + dx, drag.originY + dy);
+          const next = clampPosition({ x: drag.origin.x + dx, y: drag.origin.y + dy });
           positionRef.current = next;
           setPosition(next);
         };
 
         const endDrag = event => {
-          if (!dragRef.current) return;
+          const drag = dragRef.current;
+          if (!drag) return;
           dragRef.current = null;
-          event.currentTarget.releasePointerCapture?.(event.pointerId);
-          if (positionRef.current) savePosition(positionRef.current);
-          if (!movedRef.current) setBubble(value => !value);
+          setDragging(false);
+          try { event.currentTarget.releasePointerCapture(drag.pointerId); } catch {}
+          if (movedRef.current) savePosition(positionRef.current);
+          else setBubble(value => !value);
         };
 
         if (hidden) {
           return h('button', {
             type: 'button',
             title: '显示 Claude 桌宠',
+            'aria-label': '显示 Claude 桌宠',
             onClick: () => setHidden(false),
-            style: {
-              position: 'fixed',
-              right: '22px',
-              bottom: '22px',
-              zIndex: 2147483000,
-              width: '30px',
-              height: '30px',
-              borderRadius: '50%',
-              border: '1px solid rgba(240, 200, 150, .35)',
-              background: 'rgba(30, 27, 24, .94)',
-              color: '#f7e8d2',
-              cursor: 'pointer',
-              boxShadow: '0 6px 18px rgba(0,0,0,.3)'
-            }
-          }, '◉');
+            style: dotStyle
+          });
         }
 
-        return h('div', { style, 'data-claude-pet': true },
-          bubble && h('div', { style: bubbleStyle, 'data-ui': true },
+        const state = LABEL[snapshot.state] ? snapshot.state : 'idle';
+        const task = snapshot.task && snapshot.task.total > 0 ? snapshot.task : null;
+        const taskPercent = task ? Math.round(task.progress * 100) : 0;
+        const art = dragging ? ART.dragging : (ART[state] ?? ART.idle);
+        const bubbleBelow = position.y < 240;
+        const bubbleAlign = position.x < 250
+          ? { left: '0px' }
+          : { right: '0px' };
+        const bubbleVertical = bubbleBelow
+          ? { top: (PET_H + 2) + 'px' }
+          : { bottom: (PET_H - HEAD_TOP + 8) + 'px' };
+
+        return h('div', {
+          'data-claude-pet': true,
+          'data-state': state,
+          style: {
+            position: 'fixed',
+            left: position.x + 'px',
+            top: position.y + 'px',
+            width: PET_W + 'px',
+            height: PET_H + 'px',
+            zIndex: 2147483000,
+            pointerEvents: 'none',
+            userSelect: 'none'
+          }
+        },
+          bubble && h('div', { style: { ...bubbleStyle, ...bubbleAlign, ...bubbleVertical }, 'data-ui': true },
             h('div', { style: headerStyle },
               h('span', { style: { fontWeight: 700, color: '#f0a269' } }, 'Claude'),
               h('span', { style: { display: 'flex', gap: '6px', alignItems: 'center' } },
@@ -273,14 +271,44 @@
             )
           ),
           h('div', {
-            style: petBoxStyle,
+            'data-pet-drag': 'true',
+            title: '拖动我；单击切换气泡',
             onPointerDown: beginDrag,
             onPointerMove: moveDrag,
             onPointerUp: endDrag,
             onPointerCancel: endDrag,
-            title: '拖动我；单击切换气泡'
+            style: {
+              position: 'absolute',
+              inset: 0,
+              pointerEvents: 'auto',
+              touchAction: 'none',
+              cursor: dragging ? 'grabbing' : 'grab'
+            }
           },
-            h('canvas', { ref: canvasRef, width: CELL_W, height: CELL_H, style: canvasStyle, 'aria-label': 'Claude 桌宠：' + (LABEL[state] ?? state) })
+            h('div', {
+              style: {
+                position: 'absolute',
+                inset: 0,
+                overflow: 'hidden',
+                filter: 'drop-shadow(0 8px 10px rgba(0, 0, 0, .28))'
+              }
+            },
+              h('img', {
+                src: ART_URL + art,
+                alt: 'Claude 桌宠：' + (LABEL[state] ?? state),
+                draggable: false,
+                'data-art': art,
+                style: {
+                  position: 'absolute',
+                  left: IMG_LEFT + 'px',
+                  top: IMG_TOP + 'px',
+                  width: IMG_W + 'px',
+                  height: IMG_H + 'px',
+                  pointerEvents: 'none',
+                  userSelect: 'none'
+                }
+              })
+            )
           )
         );
       }
@@ -296,6 +324,6 @@
       }
 
       return { apply, inject, name };
-  }
+    }
   });
 })();

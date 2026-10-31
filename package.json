@@ -1,7 +1,7 @@
-{
+﻿{
   "name": "claude-pet-dsh",
-  "version": "0.1.0",
-  "description": "Claude Pet for DeepSeek Harness: a shell overlay that mirrors DSH turn/tool/todo state with a replaceable character atlas.",
+  "version": "0.2.0",
+  "description": "Claude Pet for DeepSeek Harness: a Clawd overlay that mirrors DSH turn/tool/todo state with animated SVG art.",
   "type": "module",
   "main": "index.js",
   "icon": "assets/icon.png",

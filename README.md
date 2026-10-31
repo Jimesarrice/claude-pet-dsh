@@ -1,14 +1,14 @@
 # claude-pet-dsh
 
-![DSH overlay](assets/preview.png)
+![Clawd](assets/svg/clawd-mini-idle.svg)
 
-把 Claude 桌宠接进 **DeepSeek Harness（DSH）** 的 Web / Desktop 界面。它是一个 DSH 客户端插件：
+把 Claude 桌宠 **Clawd** 接进 **DeepSeek Harness（DSH）** 的 Web / Desktop 界面。它是一个 DSH 客户端插件：
 
 - 在 `shell.overlay` 上显示右下角桌宠；
 - 监听 DSH 的 `session/event`（turn / tool / approval / todo）和 `agent/error`；
-- 根据当前会话状态播放 8×9 图集里的动作；
+- 按会话状态切换 `assets/svg/` 里自带 CSS 动画的 Clawd 形象；
 - 气泡显示当前任务与 `completed/total` 进度；
-- 可拖动、收起、隐藏，位置保存在浏览器 `localStorage`。
+- 可拖到窗口内任意位置，单击切换气泡，隐藏后缩成右下角小圆点；位置保存在浏览器 `localStorage`。
 
 ## 安装
 
@@ -41,28 +41,41 @@ DSH 重启后生效。
 
 ## 使用
 
-- 启动后右下角出现角色。
-- 拖动角色可移动；单击切换气泡；气泡里的“收起”只隐藏气泡，“隐藏”缩成右下角小圆点。
+- 启动后右下角出现 Clawd，默认位置距窗口右下角 24 px。
+- 按住角色拖动可放到窗口内任意位置（横向、纵向都到边），松开后记住位置。
+- 单击角色切换气泡；“收起”只隐藏气泡，“隐藏”把角色缩成右下角小圆点，点小圆点恢复。
 - 状态映射：
-  - `turn/start` → 工作；
-  - `tool/call` → 工作，`ask_user_question` → 等待；
+  - `turn/start` → 工作（`clawd-working-typing`）；
+  - `tool/call` → 工作，`ask_user_question` → 等待（`clawd-mini-peek`）；
   - `approval/asked` → 等待；
   - `tool/result` → 工作；
   - `todo/write` → 更新任务标题与 `completed/total`；
-  - `turn/end: completed` → 完成（8 秒后回到待机）；
-  - `turn/end: error/max-tokens/timeout` → 出错；
+  - `turn/end: completed` → 完成（`clawd-happy`，8 秒后回到待机）；
+  - `turn/end: error/max-tokens/timeout` → 出错（`clawd-error`）；
   - `turn/end: blocked` → 等待；
-  - `agent/error` → 出错。
+  - `agent/error` → 出错；
+  - 拖动中 → `clawd-react-drag`。
 
-宿主路由：`GET /claude-pet-dsh/state`、`/claude-pet-dsh/spritesheet.webp`、`/claude-pet-dsh/health`。
+宿主路由：`GET /claude-pet-dsh/state`、`/claude-pet-dsh/assets/svg/<name>.svg`、`/claude-pet-dsh/health`。
 
 ## 自定义角色
 
-`assets/spritesheet.webp` 是 Petdex 兼容的 8×9 图集（1536×1872，192×208 单元格），行序：
+`assets/svg/` 里是 45×45 viewBox、自带 CSS 动画的 Clawd 形象。`client.js` 顶部的 `ART` 表决定状态到文件的映射，`CROP`/`SCALE` 控制取景与显示尺寸：
 
-0 idle、1 running-right、2 running-left、3 waving、4 jumping、5 failed、6 waiting、7 running、8 review。
+```js
+const ART = {
+  idle: 'clawd-mini-idle.svg',
+  working: 'clawd-working-typing.svg',
+  waiting: 'clawd-mini-peek.svg',
+  complete: 'clawd-happy.svg',
+  error: 'clawd-error.svg',
+  connecting: 'clawd-wake.svg',
+  offline: 'clawd-sleeping.svg',
+  dragging: 'clawd-react-drag.svg'
+};
+```
 
-替换这个文件即可换角色；`client.js` 里的 `ROWS` 控制状态到行/帧数的映射。
+换角色时把同名 SVG 放进 `assets/svg/` 即可，动画会随 `<img>` 一起播放。
 
 ## 兼容性
 
@@ -73,4 +86,4 @@ DSH 重启后生效。
 
 ## 来源与许可
 
-MIT，Copyright (c) 2026 State Interface contributors。桌宠形象与图集取自 State Interface 项目（`state-interface` / `state-interface-pet`）的角色资源，本仓库由该项目的 `dsh-plugin` 改名整理而来；独立社区项目，与 Anthropic 无官方关联。
+MIT，Copyright (c) 2026 State Interface contributors。Clawd 形象与 SVG 动画取自 State Interface 项目的角色资源，本仓库由该项目的 `dsh-plugin` 改名整理而来；独立社区项目，与 Anthropic 无官方关联。

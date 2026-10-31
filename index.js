@@ -12,6 +12,7 @@ const ROUTE = '/claude-pet-dsh';
 const MIME = {
   '.webp': 'image/webp',
   '.png': 'image/png',
+  '.svg': 'image/svg+xml',
   '.json': 'application/json; charset=utf-8',
   '.txt': 'text/plain; charset=utf-8'
 };
@@ -90,10 +91,6 @@ export function apply(ctx) {
       }
       if (req.method === 'GET' && sub === '/health') {
         sendJson(res, 200, { ok: true, plugin: 'claude-pet-dsh' });
-        return;
-      }
-      if (req.method === 'GET' && sub === '/spritesheet.webp') {
-        sendFile(res, join(ASSETS, 'spritesheet.webp'));
         return;
       }
       if (req.method === 'GET' && sub === '/icon.png') {
