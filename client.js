@@ -8,37 +8,38 @@
 
       const BASE = '/claude-pet-dsh';
       const STATE_URL = BASE + '/state';
+      const SHEET_URL = BASE + '/spritesheet.webp';
       const ART_URL = BASE + '/assets/svg/';
       const POS_KEY = 'claude-pet-dsh.position.v2';
 
-      // Artwork geometry: every Clawd SVG uses viewBox="-15 -25 45 45", with the
-      // character body sitting around x 0..15, y 6..16. We crop a window out of
-      // that canvas and scale it, so the transparent padding never becomes an
-      // invisible click target and animated accessories above the head stay in view.
-      const VIEW = { x: -15, y: -25, w: 45, h: 45 };
-      const CROP = { x: -6, y: -9, w: 23, h: 28 };
-      const SCALE = 7;
-      const PET_W = Math.round(CROP.w * SCALE);
-      const PET_H = Math.round(CROP.h * SCALE);
-      const IMG_W = VIEW.w * SCALE;
-      const IMG_H = VIEW.h * SCALE;
-      const IMG_LEFT = Math.round((VIEW.x - CROP.x) * SCALE);
-      const IMG_TOP = Math.round((VIEW.y - CROP.y) * SCALE);
-      const HEAD_TOP = Math.round((4.5 - CROP.y) * SCALE);
+      // Expanded form: the original 8x9 character atlas (1536x1872, 192x208 cells).
+      const CELL_W = 192;
+      const CELL_H = 208;
+      const FRAME_MS = 130;
+      const PET_W = 168;
+      const PET_H = 182;
       const EDGE = 8;
 
-      const ART = {
-        idle: 'clawd-mini-idle.svg',
-        working: 'clawd-working-typing.svg',
-        waiting: 'clawd-mini-peek.svg',
-        complete: 'clawd-happy.svg',
-        error: 'clawd-error.svg',
-        connecting: 'clawd-wake.svg',
-        offline: 'clawd-sleeping.svg',
-        dragging: 'clawd-react-drag.svg'
+      const ROWS = {
+        idle: { row: 0, frames: 6, loop: true },
+        working: { row: 7, frames: 6, loop: true },
+        waiting: { row: 6, frames: 6, loop: true },
+        complete: { row: 4, frames: 5, loop: false },
+        error: { row: 5, frames: 8, loop: true },
+        connecting: { row: 3, frames: 4, loop: true },
+        offline: { row: 0, frames: 6, loop: true }
       };
 
-      // Minimized form: a small Clawd peeking from the corner, using the mini art.
+      // Minimized form: a small Clawd peeking from the corner, using the mini SVGs.
+      const VIEW = { x: -15, y: -25, w: 45, h: 45 };
+      const MINI_CROP = { x: -2, y: -5, w: 19, h: 23 };
+      const MINI_W = 60;
+      const MINI_SCALE = MINI_W / MINI_CROP.w;
+      const MINI_H = Math.round(MINI_CROP.h * MINI_SCALE);
+      const MINI_IMG_W = Math.round(VIEW.w * MINI_SCALE);
+      const MINI_IMG_LEFT = Math.round((VIEW.x - MINI_CROP.x) * MINI_SCALE);
+      const MINI_IMG_TOP = Math.round((VIEW.y - MINI_CROP.y) * MINI_SCALE);
+
       const MINI = {
         idle: 'clawd-mini-idle.svg',
         working: 'clawd-mini-typing.svg',
@@ -48,14 +49,6 @@
         connecting: 'clawd-mini-enter.svg',
         offline: 'clawd-mini-sleep.svg'
       };
-
-      const MINI_CROP = { x: -2, y: -5, w: 19, h: 23 };
-      const MINI_W = 60;
-      const MINI_SCALE = MINI_W / MINI_CROP.w;
-      const MINI_H = Math.round(MINI_CROP.h * MINI_SCALE);
-      const MINI_IMG_W = Math.round(VIEW.w * MINI_SCALE);
-      const MINI_IMG_LEFT = Math.round((VIEW.x - MINI_CROP.x) * MINI_SCALE);
-      const MINI_IMG_TOP = Math.round((VIEW.y - MINI_CROP.y) * MINI_SCALE);
 
       const LABEL = {
         idle: '待机',
@@ -149,8 +142,8 @@
 
       function defaultPosition() {
         return clampPosition({
-          x: window.innerWidth - PET_W - 8,
-          y: window.innerHeight - PET_H - 12
+          x: window.innerWidth - PET_W - 24,
+          y: window.innerHeight - PET_H - 24
         });
       }
 
@@ -161,6 +154,58 @@
         if (state === 'complete') return '这一轮完成啦。';
         if (state === 'error') return '卡住了，看看我。';
         return COPY[state] ?? '';
+      }
+
+      /**
+       * Draws the atlas on its own canvas. Living in a child component means the
+       * animation restarts whenever the pet is expanded again, so hiding and
+       * restoring the pet cannot leave a blank canvas behind.
+       */
+      function SpritePet({ state }) {
+        const canvasRef = useRef(null);
+        const stateRef = useRef(state);
+        stateRef.current = state;
+
+        useEffect(() => {
+          const canvas = canvasRef.current;
+          if (!canvas) return;
+          const ctx = canvas.getContext('2d');
+          const image = new Image();
+          image.src = SHEET_URL;
+          let raf = 0;
+          let row = -1;
+          let started = 0;
+          const draw = now => {
+            const current = stateRef.current || 'idle';
+            const meta = ROWS[current] || ROWS.idle;
+            if (meta.row !== row) { row = meta.row; started = now; canvas.dataset.row = String(meta.row); }
+            if (image.complete && image.naturalWidth) {
+              let frame = Math.floor((now - started) / FRAME_MS);
+              frame = meta.loop ? frame % meta.frames : Math.min(frame, meta.frames - 1);
+              ctx.clearRect(0, 0, CELL_W, CELL_H);
+              ctx.imageSmoothingEnabled = false;
+              ctx.drawImage(image, frame * CELL_W, meta.row * CELL_H, CELL_W, CELL_H, 0, 0, CELL_W, CELL_H);
+            }
+            raf = requestAnimationFrame(draw);
+          };
+          raf = requestAnimationFrame(draw);
+          return () => cancelAnimationFrame(raf);
+        }, []);
+
+        return h('canvas', {
+          ref: canvasRef,
+          width: CELL_W,
+          height: CELL_H,
+          'data-sprite-canvas': true,
+          'aria-label': 'Claude 桌宠：' + (LABEL[state] ?? state),
+          style: {
+            display: 'block',
+            width: PET_W + 'px',
+            height: PET_H + 'px',
+            imageRendering: 'pixelated',
+            pointerEvents: 'none'
+          }
+        });
       }
 
       function Pet() {
@@ -263,14 +308,13 @@
 
         const task = snapshot.task && snapshot.task.total > 0 ? snapshot.task : null;
         const taskPercent = task ? Math.round(task.progress * 100) : 0;
-        const art = dragging ? ART.dragging : (ART[state] ?? ART.idle);
-        const bubbleBelow = position.y < 240;
+        const bubbleBelow = position.y < 230;
         const bubbleAlign = position.x < 250
           ? { left: '0px' }
           : { right: '0px' };
         const bubbleVertical = bubbleBelow
           ? { top: (PET_H + 2) + 'px' }
-          : { bottom: (PET_H - HEAD_TOP + 8) + 'px' };
+          : { bottom: (PET_H + 8) + 'px' };
 
         return h('div', {
           'data-claude-pet': true,
@@ -328,25 +372,10 @@
               style: {
                 position: 'absolute',
                 inset: 0,
-                overflow: 'hidden',
-                filter: 'drop-shadow(0 8px 10px rgba(0, 0, 0, .28))'
+                filter: 'drop-shadow(0 10px 14px rgba(0, 0, 0, .28))'
               }
             },
-              h('img', {
-                src: ART_URL + art,
-                alt: 'Claude 桌宠：' + (LABEL[state] ?? state),
-                draggable: false,
-                'data-art': art,
-                style: {
-                  position: 'absolute',
-                  left: IMG_LEFT + 'px',
-                  top: IMG_TOP + 'px',
-                  width: IMG_W + 'px',
-                  height: IMG_H + 'px',
-                  pointerEvents: 'none',
-                  userSelect: 'none'
-                }
-              })
+              h(SpritePet, { state })
             )
           )
         );

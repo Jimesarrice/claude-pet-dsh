@@ -93,6 +93,10 @@ export function apply(ctx) {
         sendJson(res, 200, { ok: true, plugin: 'claude-pet-dsh' });
         return;
       }
+      if (req.method === 'GET' && sub === '/spritesheet.webp') {
+        sendFile(res, join(ASSETS, 'spritesheet.webp'));
+        return;
+      }
       if (req.method === 'GET' && sub === '/icon.png') {
         sendFile(res, join(ASSETS, 'icon.png'));
         return;
