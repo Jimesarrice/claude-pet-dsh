@@ -1,0 +1,65 @@
+{
+  "name": "claude-pet-dsh",
+  "version": "0.1.0",
+  "description": "Claude Pet for DeepSeek Harness: a shell overlay that mirrors DSH turn/tool/todo state with a replaceable character atlas.",
+  "type": "module",
+  "main": "index.js",
+  "icon": "assets/icon.png",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jimesarrice/claude-pet-dsh.git"
+  },
+  "homepage": "https://github.com/Jimesarrice/claude-pet-dsh#readme",
+  "bugs": {
+    "url": "https://github.com/Jimesarrice/claude-pet-dsh/issues"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "desktop-pet",
+    "claude",
+    "overlay"
+  ],
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml"
+  },
+  "files": [
+    "index.js",
+    "state.js",
+    "client.js",
+    "assets",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.4",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-layout"
+      ]
+    },
+    "compatibility": {
+      "dshReleases": {
+        "0.2.1-rc.5": "compatible"
+      }
+    }
+  }
+}
