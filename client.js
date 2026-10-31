@@ -38,6 +38,25 @@
         dragging: 'clawd-react-drag.svg'
       };
 
+      // Minimized form: a small Clawd peeking from the corner, using the mini art.
+      const MINI = {
+        idle: 'clawd-mini-idle.svg',
+        working: 'clawd-mini-typing.svg',
+        waiting: 'clawd-mini-peek.svg',
+        complete: 'clawd-mini-happy.svg',
+        error: 'clawd-mini-alert.svg',
+        connecting: 'clawd-mini-enter.svg',
+        offline: 'clawd-mini-sleep.svg'
+      };
+
+      const MINI_CROP = { x: -2, y: -5, w: 19, h: 23 };
+      const MINI_W = 60;
+      const MINI_SCALE = MINI_W / MINI_CROP.w;
+      const MINI_H = Math.round(MINI_CROP.h * MINI_SCALE);
+      const MINI_IMG_W = Math.round(VIEW.w * MINI_SCALE);
+      const MINI_IMG_LEFT = Math.round((VIEW.x - MINI_CROP.x) * MINI_SCALE);
+      const MINI_IMG_TOP = Math.round((VIEW.y - MINI_CROP.y) * MINI_SCALE);
+
       const LABEL = {
         idle: '待机',
         working: '工作中',
@@ -92,19 +111,19 @@
         padding: '3px 8px'
       };
 
-      const dotStyle = {
+      const miniButtonStyle = {
         position: 'fixed',
-        right: '18px',
-        bottom: '18px',
-        zIndex: 2147483000,
-        width: '14px',
-        height: '14px',
+        right: '16px',
+        bottom: '16px',
+        width: MINI_W + 'px',
+        height: MINI_H + 'px',
         padding: 0,
-        borderRadius: '50%',
-        border: '2px solid rgba(255, 255, 255, .55)',
-        background: '#DE886D',
-        boxShadow: '0 2px 10px rgba(0, 0, 0, .35)',
-        cursor: 'pointer'
+        border: 'none',
+        background: 'transparent',
+        cursor: 'pointer',
+        pointerEvents: 'auto',
+        zIndex: 2147483000,
+        filter: 'drop-shadow(0 4px 9px rgba(0, 0, 0, .3))'
       };
 
       function loadPosition() {
@@ -211,17 +230,37 @@
           else setBubble(value => !value);
         };
 
+        const state = LABEL[snapshot.state] ? snapshot.state : 'idle';
+
         if (hidden) {
           return h('button', {
             type: 'button',
-            title: '显示 Claude 桌宠',
-            'aria-label': '显示 Claude 桌宠',
+            title: '展开 Claude 桌宠',
+            'aria-label': '展开 Claude 桌宠',
+            'data-mini-pet': true,
             onClick: () => setHidden(false),
-            style: dotStyle
-          });
+            style: miniButtonStyle
+          },
+            h('div', { style: { position: 'absolute', inset: 0, overflow: 'hidden' } },
+              h('img', {
+                src: ART_URL + (MINI[state] ?? MINI.idle),
+                alt: 'Claude 桌宠（最小化）',
+                draggable: false,
+                'data-art': MINI[state] ?? MINI.idle,
+                style: {
+                  position: 'absolute',
+                  left: MINI_IMG_LEFT + 'px',
+                  top: MINI_IMG_TOP + 'px',
+                  width: MINI_IMG_W + 'px',
+                  height: MINI_IMG_W + 'px',
+                  pointerEvents: 'none',
+                  userSelect: 'none'
+                }
+              })
+            )
+          );
         }
 
-        const state = LABEL[snapshot.state] ? snapshot.state : 'idle';
         const task = snapshot.task && snapshot.task.total > 0 ? snapshot.task : null;
         const taskPercent = task ? Math.round(task.progress * 100) : 0;
         const art = dragging ? ART.dragging : (ART[state] ?? ART.idle);

@@ -8,7 +8,7 @@
 - 监听 DSH 的 `session/event`（turn / tool / approval / todo）和 `agent/error`；
 - 按会话状态切换 `assets/svg/` 里自带 CSS 动画的 Clawd 形象；
 - 气泡显示当前任务与 `completed/total` 进度；
-- 可拖到窗口内任意位置，单击切换气泡，隐藏后缩成右下角小圆点；位置保存在浏览器 `localStorage`。
+- 可拖到窗口内任意位置，单击切换气泡，隐藏后缩成右下角的迷你 Clawd；位置保存在浏览器 `localStorage`。
 
 ## 安装
 
@@ -43,7 +43,7 @@ DSH 重启后生效。
 
 - 启动后右下角出现 Clawd，默认位置距窗口右下角 24 px。
 - 按住角色拖动可放到窗口内任意位置（横向、纵向都到边），松开后记住位置。
-- 单击角色切换气泡；“收起”只隐藏气泡，“隐藏”把角色缩成右下角小圆点，点小圆点恢复。
+- 单击角色切换气泡；“收起”只隐藏气泡，“隐藏”把角色缩成右下角的迷你 Clawd（`MINI` 表映射 `clawd-mini-*`，并跟随当前状态），点它展开回完整形象和动画，位置不变。
 - 状态映射：
   - `turn/start` → 工作（`clawd-working-typing`）；
   - `tool/call` → 工作，`ask_user_question` → 等待（`clawd-mini-peek`）；
