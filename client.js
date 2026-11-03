@@ -277,6 +277,21 @@
 
         const state = LABEL[snapshot.state] ? snapshot.state : 'idle';
 
+        // Archiving the errored conversation may never reach the store, so the
+        // bubble offers an explicit "handled" action that clears the alert.
+        const ackError = async () => {
+          try {
+            await fetch(BASE + '/ack?session=' + encodeURIComponent(snapshot.sessionId || ''), { method: 'POST' });
+          } catch {}
+          setSnapshot(s => ({ ...s, state: 'idle', task: null }));
+        };
+        const ackStyle = {
+          ...buttonStyle,
+          border: '1px solid rgba(255, 122, 122, .55)',
+          color: '#ffb4b4',
+          marginRight: 'auto'
+        };
+
         if (hidden) {
           return h('button', {
             type: 'button',
@@ -349,6 +364,7 @@
               )
             ),
             h('div', { style: { display: 'flex', justifyContent: 'flex-end', gap: '5px', marginTop: '7px', opacity: .8 } },
+              state === 'error' && h('button', { type: 'button', style: ackStyle, onClick: ackError }, '本次错误已处理'),
               h('button', { type: 'button', style: buttonStyle, onClick: () => setBubble(false) }, '收起'),
               h('button', { type: 'button', style: buttonStyle, onClick: () => setHidden(true) }, '隐藏')
             )

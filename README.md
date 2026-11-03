@@ -55,8 +55,9 @@ DSH 重启后生效。
   - `turn/end: error/max-tokens/timeout` → 出错（第 5 行）；
   - `turn/end: blocked` → 等待；
   - `agent/error` → 出错。
+- 出错状态会一直保持，直到出现以下任一恢复：该会话有新事件（如新一轮 `turn/start`）；宿主发出会话关闭/删除类生命周期事件（插件已防御性订阅 `session/close|delete|disposed|removed`，宿主没有这些事件则无副作用）；或点气泡中的 **“本次错误已处理”** 按钮——报错的对话被归档后往往不会再有任何事件，这个按钮就是显式的解除入口，点击后桌宠立即回到待机。
 
-宿主路由：`GET /claude-pet-dsh/state`、`/claude-pet-dsh/spritesheet.webp`、`/claude-pet-dsh/assets/svg/<name>.svg`、`/claude-pet-dsh/health`。
+宿主路由：`GET /claude-pet-dsh/state`、`POST /claude-pet-dsh/ack?session=<id>`、`/claude-pet-dsh/spritesheet.webp`、`/claude-pet-dsh/assets/svg/<name>.svg`、`/claude-pet-dsh/health`。
 
 ## 自定义角色
 

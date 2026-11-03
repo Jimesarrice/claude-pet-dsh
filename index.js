@@ -70,9 +70,21 @@ export function apply(ctx) {
     const offError = ctx.on('agent/error', payload => {
       store.error(payload ?? {});
     });
+    // Opportunistic recovery: if the host exposes session lifecycle events
+    // (archive/close/delete), drop the record so a stale alert cannot stick.
+    // Listening to an event that never fires is a no-op in cordis.
+    const lifecycle = [];
+    for (const name of ['session/close', 'session/delete', 'session/disposed', 'session/removed']) {
+      const off = ctx.on?.(name, payload => {
+        const id = String(payload?.header?.id ?? payload?.id ?? payload?.sessionId ?? payload ?? '');
+        if (id) store.drop(id);
+      });
+      if (off) lifecycle.push(off);
+    }
     return () => {
       offSession?.();
       offError?.();
+      lifecycle.forEach(off => { try { off?.(); } catch {} });
       store.dispose();
     };
   }, 'claude-pet-dsh: session events');
@@ -91,6 +103,12 @@ export function apply(ctx) {
       }
       if (req.method === 'GET' && sub === '/health') {
         sendJson(res, 200, { ok: true, plugin: 'claude-pet-dsh' });
+        return;
+      }
+      if (req.method === 'POST' && sub === '/ack') {
+        const session = url.searchParams.get('session') || '';
+        const cleared = store.ack(session);
+        sendJson(res, 200, { ok: true, cleared });
         return;
       }
       if (req.method === 'GET' && sub === '/spritesheet.webp') {

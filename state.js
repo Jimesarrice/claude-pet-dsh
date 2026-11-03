@@ -133,6 +133,27 @@ export class PetStateStore {
     this.set(id, { state: 'error' }, 0);
   }
 
+  /**
+   * Recovery paths for a stuck alert. DSH may never send another event for a
+   * session that was archived/closed after an error, so the host can either
+   * drop the record outright (lifecycle event) or the user can acknowledge the
+   * error from the bubble (ack). Both demote the session back to idle.
+   */
+  drop(id) {
+    this.clearTimer(id);
+    this.timers.delete(id);
+    this.sessions.delete(id);
+  }
+
+  ack(id) {
+    const rec = id ? this.sessions.get(id) : [...this.sessions.values()].find(r => r.state === 'error');
+    if (!rec) return false;
+    if (rec.state !== 'error') return false;
+    this.set(rec.id, { state: 'idle', task: null }, rec.seq + 1);
+    this.clearTimer(rec.id);
+    return true;
+  }
+
   snapshot() {
     let best = null;
     for (const rec of this.sessions.values()) {
